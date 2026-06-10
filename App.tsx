@@ -14,6 +14,9 @@ import {
 } from "@expo-google-fonts/dm-sans";
 import { View, ActivityIndicator } from "react-native";
 import SplashScreen from "./src/screens/SplashScreen";
+import HomeScreen from "./src/screens/HomeScreen";
+
+type Screen = "splash" | "home";
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -26,20 +29,26 @@ export default function App() {
     DMSans_700Bold,
   });
 
+  const [screen, setScreen] = React.useState<Screen>("splash");
+
   if (!fontsLoaded) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#0D0D2B", alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator color="#6C63FF" />
+      <View style={{ flex: 1, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator color="#2265FF" />
       </View>
     );
   }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SplashScreen
-        onNewUser={() => console.log("New user flow")}
-        onReturningUser={() => console.log("Returning user flow")}
-      />
+      {screen === "splash" ? (
+        <SplashScreen
+          onNewUser={() => setScreen("home")}
+          onReturningUser={() => setScreen("home")}
+        />
+      ) : (
+        <HomeScreen />
+      )}
     </GestureHandlerRootView>
   );
 }
