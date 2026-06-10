@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   StatusBar,
   Platform,
   Image,
+  Animated,
+  Easing,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -95,6 +97,9 @@ const assets = {
   circleYellow: require("../../assets/cards/circle-yellow.png"),
   circleOrange: require("../../assets/cards/circle-orange.png"),
   practiceTrophy: require("../../assets/cards/trophy.png"),
+  skillStress: require("../../assets/Home/Card/skill-stress.png"),
+  skillPizza:  require("../../assets/Home/Card/pizza.png"),
+  skillFace:   require("../../assets/face1.png"),
 };
 
 // ─── Section header ────────────────────────────────────────────────────────────
@@ -111,19 +116,159 @@ function SectionHeader({ title, onAll }: { title: string; onAll?: () => void }) 
   );
 }
 
+// ─── Timer option button with press-in scale animation ─────────────────────────
+function TimerOptionBtn({ opt, isSelected, onPress }: {
+  opt: { label: string; minutes: number };
+  isSelected: boolean;
+  onPress: () => void;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const onPressIn  = () => Animated.spring(scale, { toValue: 1.22, useNativeDriver: true, tension: 120, friction: 3 }).start();
+  const onPressOut = () => Animated.spring(scale, { toValue: 1,    useNativeDriver: true, tension: 100, friction: 3 }).start();
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <TouchableOpacity
+        style={[s.timerOptionBtn, isSelected && s.timerOptionBtnSelected]}
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        activeOpacity={1}
+      >
+        {opt.minutes !== -1 ? (
+          <>
+            <Image source={stopwatchIcon} style={{ width: 22, height: 22, tintColor: C.white }} resizeMode="contain" />
+            <Text style={[s.timerOptionLabel, { marginTop: 4 }]}>{opt.label}</Text>
+          </>
+        ) : (
+          <Text style={[s.timerOptionLabel, { fontSize: 20, letterSpacing: 2 }]}>···</Text>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+// ─── Timer options ─────────────────────────────────────────────────────────────
+const TIMER_OPTIONS = [
+  { label: "10m", minutes: 10 },
+  { label: "20m", minutes: 20 },
+  { label: "30m", minutes: 30 },
+  { label: "···", minutes: -1 },
+];
+const TIMER_ROW_HEIGHT = 96; // enough for 56pt button + label
+
 // ─── Header ────────────────────────────────────────────────────────────────────
 function Header({ name }: { name: string }) {
+  const [timerOpen, setTimerOpen] = React.useState(false);
+  const [selectedMinutes, setSelectedMinutes] = React.useState<number | null>(null);
+  // remainingSeconds drives the live countdown; null = no timer running
+  const [remainingSeconds, setRemainingSeconds] = React.useState<number | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Height-only animation — useNativeDriver MUST be false for layout props.
+  const heightAnim = useRef(new Animated.Value(0)).current;
+
+  // Start/restart the countdown whenever a new duration is chosen
+  React.useEffect(() => {
+    if (selectedMinutes != null && selectedMinutes > 0) {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      setRemainingSeconds(selectedMinutes * 60);
+      intervalRef.current = setInterval(() => {
+        setRemainingSeconds((s) => {
+          if (s == null || s <= 1) {
+            clearInterval(intervalRef.current!);
+            intervalRef.current = null;
+            return 0;
+          }
+          return s - 1;
+        });
+      }, 1000);
+    }
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [selectedMinutes]);
+
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60).toString().padStart(2, "0");
+    const s = (secs % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  };
+
+  const openTimer = () => {
+    setTimerOpen(true);
+    Animated.spring(heightAnim, { toValue: TIMER_ROW_HEIGHT, useNativeDriver: false, tension: 70, friction: 12 }).start();
+  };
+
+  const closeTimer = () => {
+    Animated.spring(heightAnim, { toValue: 0, useNativeDriver: false, tension: 70, friction: 12 }).start(() => setTimerOpen(false));
+  };
+
+  const selectTimer = (minutes: number) => {
+    setSelectedMinutes(minutes === -1 ? 0 : minutes);
+    // Close immediately so the pill appears at once, accordion animates away in background
+    setTimerOpen(false);
+    Animated.spring(heightAnim, { toValue: 0, useNativeDriver: false, tension: 70, friction: 12 }).start();
+  };
+
+  const dismissTimer = () => {
+    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
+    setRemainingSeconds(null);
+    setSelectedMinutes(null);
+  };
+
   return (
     <View style={s.header}>
+
+      {/* ── Accordion timer row ──
+            Plain View clips overflow; Animated.View drives height only (JS driver). ── */}
+      <View style={s.timerRowClip}>
+        <Animated.View style={[s.timerRowInner, { height: heightAnim }]}>
+          {TIMER_OPTIONS.map((opt) => (
+            <TimerOptionBtn
+              key={opt.label}
+              opt={opt}
+              isSelected={selectedMinutes === opt.minutes}
+              onPress={() => selectTimer(opt.minutes)}
+            />
+          ))}
+
+          {/* Close — white circle with blue border */}
+          <TouchableOpacity style={s.timerCloseBtn} onPress={closeTimer} activeOpacity={0.8}>
+            <Ionicons name="close" size={20} color={C.primary} />
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+
+      {/* ── Greeting + clock button ── */}
       <View style={s.headerTop}>
         <View>
           <Text style={[T.body14, { color: C.muted, marginBottom: 8 }]}>{getGreeting()}</Text>
           <Text style={T.h2}>{name}</Text>
         </View>
-        <TouchableOpacity style={[s.clockBtn, tagShadow]} activeOpacity={0.7}>
-          <Ionicons name="stopwatch-outline" size={22} color={C.primary} />
-        </TouchableOpacity>
+
+        {!timerOpen && (
+          remainingSeconds != null && remainingSeconds > 0 ? (
+            /* ── Live countdown pill: tap time = reopen picker, tap × = dismiss ── */
+            <View style={s.countdownPillBtn}>
+              <TouchableOpacity style={s.countdownPillTime} onPress={openTimer} activeOpacity={0.7}>
+                <View style={s.countdownPillGroup}>
+                  <Image source={stopwatchIcon} style={{ width: 15, height: 15, tintColor: C.primary }} resizeMode="contain" />
+                  <Text style={[T.body14b, { color: C.primary, fontSize: 14 }]}>{formatTime(remainingSeconds)}</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.countdownPillClose} onPress={dismissTimer} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}>
+                <Ionicons name="close" size={14} color={C.muted} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            /* ── Plain clock button ── */
+            <TouchableOpacity style={[s.clockBtn, tagShadow]} onPress={openTimer} activeOpacity={0.7}>
+              <Image source={stopwatchIcon} style={{ width: 22, height: 22, tintColor: C.primary }} resizeMode="contain" />
+            </TouchableOpacity>
+          )
+        )}
       </View>
+
+      {/* ── Stats row ── */}
       <View style={s.statsRow}>
         <View style={[s.countdownPill, tagShadow]}>
           <Text style={T.body14b}>📅 {daysUntilExam} days to go</Text>
@@ -252,16 +397,25 @@ function InterestCard({ title, decos }: {
 }
 
 // ─── Super skill card ──────────────────────────────────────────────────────────
-function SuperSkillCard({ duration, title, emoji }: { duration: string; title: string; emoji: string }) {
+function SuperSkillCard({ duration, title, illustration, imageStyle }: {
+  duration: string;
+  title: string;
+  illustration: any;
+  imageStyle?: object;
+}) {
   return (
     <View style={[s.skillCardShadow, cardShadow]}>
       <TouchableOpacity style={s.skillCard} activeOpacity={0.8}>
-        <View style={s.skillImageArea}>
-          <Text style={{ fontSize: 52 }}>{emoji}</Text>
-        </View>
         <View style={s.skillContent}>
-          <Text style={[T.body14, { color: C.muted, marginBottom: 4 }]}>{duration}</Text>
-          <Text style={T.body16b}>{title}</Text>
+          <Text style={[T.body14, { color: C.muted, textAlign: "center", marginBottom: 6 }]}>{duration}</Text>
+          <Text style={[T.body16b, { textAlign: "center", lineHeight: 22 }]}>{title}</Text>
+        </View>
+        <View style={s.skillIllustrationContainer}>
+          <Image
+            source={illustration}
+            style={[s.skillIllustration, imageStyle]}
+            resizeMode="cover"
+          />
         </View>
       </TouchableOpacity>
     </View>
@@ -283,19 +437,29 @@ const TABS: TabItem[] = [
   { label: "Me",         icon: "person-outline",iconActive: "person",       active: false },
 ];
 
+const homeIcon = require("../../assets/Home/Home&Furniture/house-happy.png");
+const stopwatchIcon = require("../../assets/Home/UI/stopwatch.png");
+
 function BottomTabBar() {
-  // paddingBottom = safe area for home indicator (34pt on Face ID iPhones, 0 on Android)
   const bottomInset = Platform.OS === "ios" ? 34 : 0;
   return (
     <View style={[s.tabBar, { paddingBottom: bottomInset }]}>
       <View style={s.tabRow}>
         {TABS.map((tab) => (
           <TouchableOpacity key={tab.label} style={s.tabItem} activeOpacity={0.7}>
-            <Ionicons
-              name={tab.active ? tab.iconActive : tab.icon}
-              size={24}
-              color={tab.active ? C.primary : "#3D3D3D"}
-            />
+            {tab.label === "Home" ? (
+              <Image
+                source={homeIcon}
+                style={{ width: 24, height: 24, tintColor: tab.active ? C.primary : "#3D3D3D" }}
+                resizeMode="contain"
+              />
+            ) : (
+              <Ionicons
+                name={tab.active ? tab.iconActive : tab.icon}
+                size={24}
+                color={tab.active ? C.primary : "#3D3D3D"}
+              />
+            )}
             <Text style={[s.tabLabel, { color: tab.active ? C.primary : "#3D3D3D" }]}>
               {tab.label}
             </Text>
@@ -392,11 +556,18 @@ export default function HomeScreen() {
           {/* Learn super skills */}
           <View style={s.section}>
             <SectionHeader title="Learn super skills:" onAll={() => {}} />
+            {/* Stress: render taller than container, shift up to reveal bottom (person + bike) */}
             <SuperSkillCard duration="5 min"
-              title="Introduction to dealing with stress" emoji="🧘" />
-            <View style={{ height: 12 }} />
+              title="Introduction to dealing with stress"
+              illustration={assets.skillStress}
+              imageStyle={{ height: 277, marginTop: -77 }} />
+            <View style={{ height: 16 }} />
+            {/* Pizza: fill container height exactly, no gap */}
             <SuperSkillCard duration="5 min"
-              title="4 easy-peasy learning methods to try out" emoji="💡" />
+              title="4 easy-peasy learning methods to try out"
+              illustration={assets.skillPizza}
+              imageStyle={{ height: 200 }} />
+
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -440,6 +611,69 @@ const s = StyleSheet.create({
     borderWidth: 2, borderColor: C.primary,
     alignItems: "center", justifyContent: "center",
     backgroundColor: C.white,
+  },
+  countdownPillBtn: {
+    height: 40, borderRadius: 20,
+    width: 116,
+    flexDirection: "row",
+    alignItems: "stretch",        // children fill full height for correct border divider
+    backgroundColor: C.white,
+    borderWidth: 1.5, borderColor: C.border,
+    overflow: "hidden",
+  },
+  countdownPillTime: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  countdownPillGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  countdownPillClose: {
+    width: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderLeftWidth: 1,
+    borderLeftColor: C.border,
+  },
+  // ── Timer accordion row ──────────────────────────
+  timerRowClip: {
+    overflow: "hidden",           // plain View owns the clip — no animation on this node
+  },
+  timerRowInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 4,
+    height: TIMER_ROW_HEIGHT,
+  },
+  timerOptionBtn: {
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: C.primary,
+    alignItems: "center", justifyContent: "center",
+    shadowColor: C.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+    flexDirection: "column",
+  },
+  timerOptionBtnSelected: {
+    backgroundColor: "#1A50D4",
+    transform: [{ scale: 1.08 }],
+  },
+  timerOptionLabel: {
+    fontFamily: "Karla_700Bold",
+    fontSize: 11,
+    color: C.white,
+  },
+  timerCloseBtn: {
+    width: 56, height: 56, borderRadius: 28,
+    borderWidth: 2, borderColor: C.primary,
+    backgroundColor: C.white,
+    alignItems: "center", justifyContent: "center",
   },
   statsRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   countdownPill: {
@@ -556,18 +790,31 @@ const s = StyleSheet.create({
     backgroundColor: C.white,
   },
 
-  // Skill card
+  // Skill card — full width, text top-centre, illustration bleeds to bottom edge
   skillCardShadow: { borderRadius: 24 },
   skillCard: {
-    backgroundColor: C.offWhite, borderRadius: 24,
-    overflow: "hidden",           // clips the image area — shadow is on wrapper
+    backgroundColor: C.white,
+    borderRadius: 24,
+    overflow: "hidden",
     borderWidth: 1, borderColor: C.border,
   },
-  skillImageArea: {
-    height: 130, backgroundColor: "#EDECEA",
-    alignItems: "center", justifyContent: "center",
+  skillContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    alignItems: "center",
   },
-  skillContent: { padding: 16 },
+  // Container clips the shifted image so no overflow shows outside the card
+  skillIllustrationContainer: {
+    height: 200,
+    width: "100%",
+    overflow: "hidden",
+  },
+  // Base: fills container width; imageStyle per card controls height + vertical position
+  skillIllustration: {
+    width: "100%",
+    height: 200,
+  },
 
   // Tab bar — flush at bottom, frosted glass, 24px top radius
   tabBar: {
