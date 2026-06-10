@@ -1,5 +1,6 @@
 import React from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { useFonts } from "@expo-google-fonts/karla";
 import {
   Karla_700Bold,
   Karla_400Regular,

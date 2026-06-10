@@ -12,10 +12,11 @@ import {
   Image,
 } from "react-native";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 
 const illustration = require("../../assets/illustration-starter.png");
 
+// Simple fade+slide entrance animation
 function FadeSlideIn({
   children,
   delay = 0,
@@ -75,17 +76,17 @@ export default function SplashScreen({ onNewUser, onReturningUser }: Props) {
           </Text>
         </FadeSlideIn>
 
-        {/* Illustration */}
-        <FadeSlideIn delay={200} style={styles.illustrationWrapper}>
-          <Image
-            source={illustration}
-            style={styles.illustration}
-            resizeMode="contain"
-          />
-        </FadeSlideIn>
+        {/* Gray zone: illustration + buttons seamlessly connected */}
+        <View style={styles.grayZone}>
+          <FadeSlideIn delay={200} style={styles.illustrationWrapper}>
+            <Image
+              source={illustration}
+              style={styles.illustration}
+              resizeMode="cover"
+            />
+          </FadeSlideIn>
 
-        {/* Bottom panel */}
-        <FadeSlideIn delay={380} style={styles.bottomPanel}>
+          <FadeSlideIn delay={380} style={styles.bottomPanel}>
           <TouchableOpacity
             style={styles.buttonSecondary}
             onPress={onReturningUser}
@@ -102,8 +103,12 @@ export default function SplashScreen({ onNewUser, onReturningUser }: Props) {
             <Text style={styles.buttonPrimaryText}>I'm new here 🚀</Text>
           </TouchableOpacity>
         </FadeSlideIn>
+        </View>
 
       </SafeAreaView>
+
+      {/* Gray fill so no white gap at very bottom on tall phones */}
+      <View style={styles.bottomFill} />
     </View>
   );
 }
@@ -115,14 +120,15 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
   },
 
   // Top
   topSection: {
     alignItems: "center",
-    paddingTop: 28,
+    paddingTop: 20,
     paddingHorizontal: 32,
+    paddingBottom: 80,
   },
   appName: {
     fontFamily: "Karla_700Bold",
@@ -147,27 +153,31 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
 
+  grayZone: {
+    backgroundColor: "#F7F7F7",
+  },
+
   // Illustration
   illustrationWrapper: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "flex-end",
     overflow: "hidden",
   },
   illustration: {
-    width: width * 1.1,
-    height: height * 0.32,
+    width: width * 1.15,
+    height: 220,
+    marginLeft: -width * 0.07,
   },
 
-  // Bottom panel
+  // Bottom panel — gray matches the illustration ground
   bottomPanel: {
     backgroundColor: "#F7F7F7",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
     paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 12,
+    paddingTop: 20,
+    paddingBottom: 16,
     gap: 12,
+  },
+  bottomFill: {
+    backgroundColor: "#F7F7F7",
+    height: 40,
   },
   buttonPrimary: {
     backgroundColor: "#2265FF",
@@ -193,11 +203,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1.5,
     borderColor: "#2265FF",
-    shadowColor: "#2265FF",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    elevation: 2,
   },
   buttonSecondaryText: {
     fontFamily: "Karla_700Bold",
