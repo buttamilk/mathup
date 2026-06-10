@@ -16,8 +16,8 @@ module.exports = {
         surface: "#F7F7FF",
       },
       fontFamily: {
-        grotesk: ["SpaceGrotesk_700Bold"],
-        "grotesk-medium": ["SpaceGrotesk_500Medium"],
+        karla: ["Karla_700Bold"],
+        "karla-regular": ["Karla_400Regular"],
         caveat: ["Caveat_700Bold"],
         sans: ["DMSans_400Regular"],
         "sans-medium": ["DMSans_500Medium"],

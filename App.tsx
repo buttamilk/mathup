@@ -1,11 +1,10 @@
-import "./global.css";
 import React from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
-  useFonts,
-  SpaceGrotesk_700Bold,
-  SpaceGrotesk_500Medium,
-} from "@expo-google-fonts/space-grotesk";
+  Karla_700Bold,
+  Karla_400Regular,
+  Karla_500Medium,
+} from "@expo-google-fonts/karla";
 import { Caveat_700Bold } from "@expo-google-fonts/caveat";
 import {
   DMSans_400Regular,
@@ -17,8 +16,9 @@ import SplashScreen from "./src/screens/SplashScreen";
 
 export default function App() {
   const [fontsLoaded] = useFonts({
-    SpaceGrotesk_700Bold,
-    SpaceGrotesk_500Medium,
+    Karla_700Bold,
+    Karla_400Regular,
+    Karla_500Medium,
     Caveat_700Bold,
     DMSans_400Regular,
     DMSans_500Medium,
