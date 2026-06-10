@@ -14,53 +14,9 @@ import {
   Easing,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { C, T, cardShadow, tagShadow, activeCardStyle, activePillStyle } from "../theme";
 
 const { width } = Dimensions.get("window");
-
-// ─── Design tokens (from Figma component library) ─────────────────────────────
-const C = {
-  text:       "#222222",
-  muted:      "#5F5F5F",
-  primary:    "#2265FF",
-  border:     "#E2E2E2",
-  shadow:     "#E1E1E1",
-  cardBg:     "#FFFFFF",
-  offWhite:   "#F4F3EB",
-  pageBg:     "#FFFFFF",
-  pink:       "#D95494",
-  pink2:      "#C0407A",
-  pink3:      "#A8316A",
-  white:      "#FFFFFF",
-};
-
-// Typography — exact from Figma
-const T = StyleSheet.create({
-  h2:       { fontFamily: "Karla_700Bold", fontSize: 32, lineHeight: 32, letterSpacing: -1.6, color: C.text },
-  h3:       { fontFamily: "Karla_700Bold", fontSize: 24, lineHeight: 32, color: C.text },
-  h16:      { fontFamily: "Karla_700Bold", fontSize: 16, lineHeight: 24, color: C.text },
-  body16b:  { fontFamily: "Karla_700Bold", fontSize: 16, lineHeight: 20, color: C.text },
-  body16:   { fontFamily: "Karla_400Regular", fontSize: 16, lineHeight: 20, color: C.text },
-  body14b:  { fontFamily: "Karla_700Bold", fontSize: 14, lineHeight: 22, color: C.text },
-  body14:   { fontFamily: "Karla_400Regular", fontSize: 14, lineHeight: 18, color: C.text },
-});
-
-// "Drawn" shadow — solid colour, zero blur, hard offset following card shape
-// Matches Figma spec: 0px 4px 0px #DADADA
-const cardShadow = {
-  shadowColor: "#CACACA",
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 1,
-  shadowRadius: 0,
-  elevation: 3,
-};
-
-const tagShadow = {
-  shadowColor: "#CACACA",
-  shadowOffset: { width: 0, height: 3 },
-  shadowOpacity: 1,
-  shadowRadius: 0,
-  elevation: 2,
-};
 
 // Days until exam
 const EXAM_DATE = new Date("2026-09-15");
@@ -318,27 +274,31 @@ const dotLabel: Record<DotType, string> = {
 };
 
 function TopicCard({
-  icon, bgImage, number, title, dot,
+  icon, bgImage, number, title, dot, selected = false, onPress,
 }: {
   icon: any; bgImage: any; number: number; title: string; dot: DotType;
+  selected?: boolean; onPress?: () => void;
 }) {
+  const [pressed, setPressed] = React.useState(false);
+  const active = selected || pressed;
   return (
     <View style={[s.topicCardShadow, cardShadow]}>
-      <TouchableOpacity style={s.topicCard} activeOpacity={0.8}>
-        {/* Fixed-height image area */}
+      <TouchableOpacity
+        style={[s.topicCard, active && activeCardStyle]}
+        activeOpacity={1}
+        onPress={onPress}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
+      >
         <View style={s.topicImageArea}>
           <Image source={bgImage} style={s.topicBg} resizeMode="cover" />
           <Image source={icon} style={s.topicIcon} resizeMode="contain" />
         </View>
-
-        {/* Title area — fixed height, centred, so dot always lands at same Y */}
         <View style={s.topicTitleArea}>
           <Text style={[T.body16b, { textAlign: "center", lineHeight: 22, color: C.text }]} numberOfLines={3}>
             {number}. {title}
           </Text>
         </View>
-
-        {/* Dot label — centred, plain dot + text, no box */}
         <View style={s.dotRow}>
           <Image source={dotAsset[dot]} style={{ width: 9, height: 9 }} resizeMode="contain" />
           <Text style={[T.body14, { color: C.muted }]}>{dotLabel[dot]}</Text>
@@ -349,19 +309,35 @@ function TopicCard({
 }
 
 // ─── Basics chip ───────────────────────────────────────────────────────────────
-function BasicChip({ label }: { label: string }) {
+function BasicChip({ label, selected = false, onPress }: {
+  label: string; selected?: boolean; onPress?: () => void;
+}) {
+  const [pressed, setPressed] = React.useState(false);
+  const active = selected || pressed;
   return (
-    <TouchableOpacity style={[s.chip, tagShadow]} activeOpacity={0.75}>
-      <Text style={T.body14}>{label}</Text>
+    <TouchableOpacity
+      style={[s.chip, tagShadow, active && activePillStyle]}
+      activeOpacity={1}
+      onPress={onPress}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+    >
+      <Text style={[T.body14, active && { color: C.white }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
 // ─── Practice test card ────────────────────────────────────────────────────────
 function PracticeCard({ title, circle }: { title: string; circle: any }) {
+  const [pressed, setPressed] = React.useState(false);
   return (
     <View style={[s.practiceCardShadow, cardShadow]}>
-      <TouchableOpacity style={s.practiceCard} activeOpacity={0.8}>
+      <TouchableOpacity
+        style={[s.practiceCard, pressed && activeCardStyle]}
+        activeOpacity={1}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
+      >
         <View style={s.practiceImageArea}>
           <Image source={circle} style={s.practiceCircle} resizeMode="contain" />
           <Image source={assets.practiceTrophy} style={s.practiceTrophy} resizeMode="contain" />
@@ -373,21 +349,23 @@ function PracticeCard({ title, circle }: { title: string; circle: any }) {
 }
 
 // ─── Interest card ─────────────────────────────────────────────────────────────
-type InterestDecoProps = { sources: any[]; positions: object[] };
-
 function InterestCard({ title, decos }: {
   title: string;
   decos: { source: any; style: object }[];
 }) {
+  const [pressed, setPressed] = React.useState(false);
   return (
     <View style={[s.interestCardShadow, cardShadow]}>
-      <TouchableOpacity style={s.interestCard} activeOpacity={0.85}>
-        {/* Text — left side */}
+      <TouchableOpacity
+        style={[s.interestCard, pressed && { borderWidth: 2, borderColor: "rgba(255,255,255,0.6)" }]}
+        activeOpacity={1}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
+      >
         <View style={s.interestText}>
           <Text style={[T.body16b, { color: C.white }]}>{title}</Text>
           <Text style={[T.body16, { color: "rgba(255,255,255,0.80)", marginTop: 2 }]}>Solve tasks</Text>
         </View>
-        {/* Decorations — right side, absolutely positioned, clipped by card */}
         {decos.map((d, i) => (
           <Image key={i} source={d.source} style={[s.interestDeco, d.style]} resizeMode="contain" />
         ))}
@@ -398,24 +376,23 @@ function InterestCard({ title, decos }: {
 
 // ─── Super skill card ──────────────────────────────────────────────────────────
 function SuperSkillCard({ duration, title, illustration, imageStyle }: {
-  duration: string;
-  title: string;
-  illustration: any;
-  imageStyle?: object;
+  duration: string; title: string; illustration: any; imageStyle?: object;
 }) {
+  const [pressed, setPressed] = React.useState(false);
   return (
     <View style={[s.skillCardShadow, cardShadow]}>
-      <TouchableOpacity style={s.skillCard} activeOpacity={0.8}>
+      <TouchableOpacity
+        style={[s.skillCard, pressed && activeCardStyle]}
+        activeOpacity={1}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
+      >
         <View style={s.skillContent}>
           <Text style={[T.body14, { color: C.muted, textAlign: "center", marginBottom: 6 }]}>{duration}</Text>
           <Text style={[T.body16b, { textAlign: "center", lineHeight: 22 }]}>{title}</Text>
         </View>
         <View style={s.skillIllustrationContainer}>
-          <Image
-            source={illustration}
-            style={[s.skillIllustration, imageStyle]}
-            resizeMode="cover"
-          />
+          <Image source={illustration} style={[s.skillIllustration, imageStyle]} resizeMode="cover" />
         </View>
       </TouchableOpacity>
     </View>
@@ -707,7 +684,7 @@ const s = StyleSheet.create({
   topicCard: {
     width: 192, backgroundColor: C.white,
     borderRadius: 24, padding: 16,
-    borderWidth: 1, borderColor: C.border,
+    borderWidth: 2, borderColor: "transparent",
     overflow: "hidden",
   },
   topicImageArea: {
@@ -740,7 +717,7 @@ const s = StyleSheet.create({
     flexDirection: "row", alignItems: "center", gap: 6,
     backgroundColor: C.white, borderRadius: 12,
     paddingHorizontal: 12, paddingVertical: 9,
-    borderWidth: 1, borderColor: C.border,
+    borderWidth: 2, borderColor: C.border,
   },
 
   // Practice card
@@ -749,7 +726,7 @@ const s = StyleSheet.create({
     width: 160, backgroundColor: C.white,
     borderRadius: 24, paddingHorizontal: 16, paddingVertical: 20,
     alignItems: "center",
-    borderWidth: 1, borderColor: C.border,
+    borderWidth: 2, borderColor: "transparent",
     overflow: "hidden",
   },
   practiceImageArea: {
@@ -796,7 +773,7 @@ const s = StyleSheet.create({
     backgroundColor: C.white,
     borderRadius: 24,
     overflow: "hidden",
-    borderWidth: 1, borderColor: C.border,
+    borderWidth: 2, borderColor: "transparent",
   },
   skillContent: {
     paddingHorizontal: 20,
