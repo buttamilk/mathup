@@ -14,7 +14,10 @@ import {
   Easing,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { C, T, cardShadow, tagShadow, activeCardStyle, activePillStyle } from "../theme";
+
+const haptic = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
 const { width } = Dimensions.get("window");
 
@@ -56,6 +59,7 @@ const assets = {
   skillStress: require("../../assets/Home/Card/skill-stress.png"),
   skillPizza:  require("../../assets/Home/Card/pizza.png"),
   skillFace:   require("../../assets/face1.png"),
+  blackCircle: require("../../assets/Home/UI/EN_Home/black circle image.png"),
 };
 
 // ─── Section header ────────────────────────────────────────────────────────────
@@ -79,8 +83,8 @@ function TimerOptionBtn({ opt, isSelected, onPress }: {
   onPress: () => void;
 }) {
   const scale = useRef(new Animated.Value(1)).current;
-  const onPressIn  = () => Animated.spring(scale, { toValue: 1.22, useNativeDriver: true, tension: 120, friction: 3 }).start();
-  const onPressOut = () => Animated.spring(scale, { toValue: 1,    useNativeDriver: true, tension: 100, friction: 3 }).start();
+  const onPressIn  = () => { haptic(); Animated.spring(scale, { toValue: 1.22, useNativeDriver: true, tension: 120, friction: 3 }).start(); };
+  const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 100, friction: 3 }).start();
 
   return (
     <Animated.View style={{ transform: [{ scale }] }}>
@@ -188,7 +192,7 @@ function Header({ name }: { name: string }) {
           ))}
 
           {/* Close — white circle with blue border */}
-          <TouchableOpacity style={s.timerCloseBtn} onPress={closeTimer} activeOpacity={0.8}>
+          <TouchableOpacity style={s.timerCloseBtn} onPress={() => { haptic(); closeTimer(); }} activeOpacity={0.8}>
             <Ionicons name="close" size={20} color={C.primary} />
           </TouchableOpacity>
         </Animated.View>
@@ -205,19 +209,19 @@ function Header({ name }: { name: string }) {
           remainingSeconds != null && remainingSeconds > 0 ? (
             /* ── Live countdown pill: tap time = reopen picker, tap × = dismiss ── */
             <View style={s.countdownPillBtn}>
-              <TouchableOpacity style={s.countdownPillTime} onPress={openTimer} activeOpacity={0.7}>
+              <TouchableOpacity style={s.countdownPillTime} onPress={() => { haptic(); openTimer(); }} activeOpacity={0.7}>
                 <View style={s.countdownPillGroup}>
                   <Image source={stopwatchIcon} style={{ width: 15, height: 15, tintColor: C.primary }} resizeMode="contain" />
                   <Text style={[T.body14b, { color: C.primary, fontSize: 14 }]}>{formatTime(remainingSeconds)}</Text>
                 </View>
               </TouchableOpacity>
-              <TouchableOpacity style={s.countdownPillClose} onPress={dismissTimer} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}>
+              <TouchableOpacity style={s.countdownPillClose} onPress={() => { haptic(); dismissTimer(); }} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}>
                 <Ionicons name="close" size={14} color={C.muted} />
               </TouchableOpacity>
             </View>
           ) : (
             /* ── Plain clock button ── */
-            <TouchableOpacity style={[s.clockBtn, tagShadow]} onPress={openTimer} activeOpacity={0.7}>
+            <TouchableOpacity style={[s.clockBtn, tagShadow]} onPress={() => { haptic(); openTimer(); }} activeOpacity={0.7}>
               <Image source={stopwatchIcon} style={{ width: 22, height: 22, tintColor: C.primary }} resizeMode="contain" />
             </TouchableOpacity>
           )
@@ -247,7 +251,7 @@ function GoalsCard() {
   return (
     // Shadow wrapper — no overflow:hidden so shadow renders on all sides
     <View style={[s.goalsCardShadow, cardShadow]}>
-      <TouchableOpacity style={s.goalsCard} activeOpacity={0.85}>
+      <TouchableOpacity style={s.goalsCard} activeOpacity={0.85} onPressIn={haptic}>
         <View style={{ flex: 1 }}>
           <Text style={[T.body16b, { color: C.white, marginBottom: 4 }]}>Your goals</Text>
           <Text style={[T.body16, { color: "rgba(255,255,255,0.85)" }]}>
@@ -274,22 +278,14 @@ const dotLabel: Record<DotType, string> = {
 };
 
 function TopicCard({
-  icon, bgImage, number, title, dot, selected = false, onPress,
+  icon, bgImage, number, title, dot, onPress,
 }: {
   icon: any; bgImage: any; number: number; title: string; dot: DotType;
-  selected?: boolean; onPress?: () => void;
+  onPress?: () => void;
 }) {
-  const [pressed, setPressed] = React.useState(false);
-  const active = selected || pressed;
   return (
     <View style={[s.topicCardShadow, cardShadow]}>
-      <TouchableOpacity
-        style={[s.topicCard, active && activeCardStyle]}
-        activeOpacity={1}
-        onPress={onPress}
-        onPressIn={() => setPressed(true)}
-        onPressOut={() => setPressed(false)}
-      >
+      <TouchableOpacity style={s.topicCard} activeOpacity={0.8} onPressIn={haptic} onPress={onPress}>
         <View style={s.topicImageArea}>
           <Image source={bgImage} style={s.topicBg} resizeMode="cover" />
           <Image source={icon} style={s.topicIcon} resizeMode="contain" />
@@ -319,7 +315,7 @@ function BasicChip({ label, selected = false, onPress }: {
       style={[s.chip, tagShadow, active && activePillStyle]}
       activeOpacity={1}
       onPress={onPress}
-      onPressIn={() => setPressed(true)}
+      onPressIn={() => { haptic(); setPressed(true); }}
       onPressOut={() => setPressed(false)}
     >
       <Text style={[T.body14, active && { color: C.white }]}>{label}</Text>
@@ -329,15 +325,9 @@ function BasicChip({ label, selected = false, onPress }: {
 
 // ─── Practice test card ────────────────────────────────────────────────────────
 function PracticeCard({ title, circle }: { title: string; circle: any }) {
-  const [pressed, setPressed] = React.useState(false);
   return (
     <View style={[s.practiceCardShadow, cardShadow]}>
-      <TouchableOpacity
-        style={[s.practiceCard, pressed && activeCardStyle]}
-        activeOpacity={1}
-        onPressIn={() => setPressed(true)}
-        onPressOut={() => setPressed(false)}
-      >
+      <TouchableOpacity style={s.practiceCard} activeOpacity={0.8} onPressIn={haptic}>
         <View style={s.practiceImageArea}>
           <Image source={circle} style={s.practiceCircle} resizeMode="contain" />
           <Image source={assets.practiceTrophy} style={s.practiceTrophy} resizeMode="contain" />
@@ -353,15 +343,9 @@ function InterestCard({ title, decos }: {
   title: string;
   decos: { source: any; style: object }[];
 }) {
-  const [pressed, setPressed] = React.useState(false);
   return (
     <View style={[s.interestCardShadow, cardShadow]}>
-      <TouchableOpacity
-        style={[s.interestCard, pressed && { borderWidth: 2, borderColor: "rgba(255,255,255,0.6)" }]}
-        activeOpacity={1}
-        onPressIn={() => setPressed(true)}
-        onPressOut={() => setPressed(false)}
-      >
+      <TouchableOpacity style={s.interestCard} activeOpacity={0.85} onPressIn={haptic}>
         <View style={s.interestText}>
           <Text style={[T.body16b, { color: C.white }]}>{title}</Text>
           <Text style={[T.body16, { color: "rgba(255,255,255,0.80)", marginTop: 2 }]}>Solve tasks</Text>
@@ -378,15 +362,9 @@ function InterestCard({ title, decos }: {
 function SuperSkillCard({ duration, title, illustration, imageStyle }: {
   duration: string; title: string; illustration: any; imageStyle?: object;
 }) {
-  const [pressed, setPressed] = React.useState(false);
   return (
     <View style={[s.skillCardShadow, cardShadow]}>
-      <TouchableOpacity
-        style={[s.skillCard, pressed && activeCardStyle]}
-        activeOpacity={1}
-        onPressIn={() => setPressed(true)}
-        onPressOut={() => setPressed(false)}
-      >
+      <TouchableOpacity style={s.skillCard} activeOpacity={0.8} onPressIn={haptic}>
         <View style={s.skillContent}>
           <Text style={[T.body14, { color: C.muted, textAlign: "center", marginBottom: 6 }]}>{duration}</Text>
           <Text style={[T.body16b, { textAlign: "center", lineHeight: 22 }]}>{title}</Text>
@@ -417,38 +395,58 @@ const TABS: TabItem[] = [
 const homeIcon = require("../../assets/Home/Home&Furniture/house-happy.png");
 const stopwatchIcon = require("../../assets/Home/UI/stopwatch.png");
 
-function BottomTabBar() {
+export type TabName = "Home" | "Superskills" | "Search" | "Me";
+
+interface BottomTabBarProps {
+  activeTab?: TabName;
+  onTabPress?: (tab: TabName) => void;
+}
+
+export function BottomTabBar({ activeTab = "Home", onTabPress }: BottomTabBarProps) {
   const bottomInset = Platform.OS === "ios" ? 34 : 0;
   return (
     <View style={[s.tabBar, { paddingBottom: bottomInset }]}>
       <View style={s.tabRow}>
-        {TABS.map((tab) => (
-          <TouchableOpacity key={tab.label} style={s.tabItem} activeOpacity={0.7}>
-            {tab.label === "Home" ? (
-              <Image
-                source={homeIcon}
-                style={{ width: 24, height: 24, tintColor: tab.active ? C.primary : "#3D3D3D" }}
-                resizeMode="contain"
-              />
-            ) : (
-              <Ionicons
-                name={tab.active ? tab.iconActive : tab.icon}
-                size={24}
-                color={tab.active ? C.primary : "#3D3D3D"}
-              />
-            )}
-            <Text style={[s.tabLabel, { color: tab.active ? C.primary : "#3D3D3D" }]}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {TABS.map((tab) => {
+          const isActive = tab.label === activeTab;
+          return (
+            <TouchableOpacity
+              key={tab.label}
+              style={s.tabItem}
+              activeOpacity={0.7}
+              onPress={() => { haptic(); onTabPress?.(tab.label as TabName); }}
+            >
+              {tab.label === "Home" ? (
+                <Image
+                  source={homeIcon}
+                  style={{ width: 24, height: 24, tintColor: isActive ? C.primary : "#3D3D3D" }}
+                  resizeMode="contain"
+                />
+              ) : (
+                <Ionicons
+                  name={isActive ? tab.iconActive : tab.icon}
+                  size={24}
+                  color={isActive ? C.primary : "#3D3D3D"}
+                />
+              )}
+              <Text style={[s.tabLabel, { color: isActive ? C.primary : "#3D3D3D" }]}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </View>
   );
 }
 
 // ─── Screen ────────────────────────────────────────────────────────────────────
-export default function HomeScreen() {
+interface HomeScreenProps {
+  activeTab?: TabName;
+  onTabPress?: (tab: TabName) => void;
+}
+
+export default function HomeScreen({ activeTab = "Home", onTabPress }: HomeScreenProps) {
   return (
     <View style={{ flex: 1, backgroundColor: C.pageBg }}>
       <StatusBar barStyle="dark-content" />
@@ -509,9 +507,15 @@ export default function HomeScreen() {
             </ScrollView>
           </View>
 
-          {/* For your interests */}
-          <View style={s.section}>
+          {/* For your interests — off-white framed section */}
+          <View style={s.interestFrame}>
+            {/* Black circle decoration — top left, partially overlapping edge */}
+            <Image source={assets.blackCircle} style={s.interestFrameCircle} resizeMode="contain" />
+
+            {/* Header */}
             <SectionHeader title="For your interests:" onAll={() => {}} />
+
+            {/* Cards */}
             <InterestCard title="Sustainable investing" decos={[
               { source: assets.interestDeco1a, style: { right: -8,  top: -10, width: 120, height: 80 } },
               { source: assets.interestDeco1b, style: { right: 60,  bottom: -8, width: 50, height: 60 } },
@@ -525,8 +529,13 @@ export default function HomeScreen() {
               { source: assets.interestDeco3, style: { right: 10, top: 4,  width: 80, height: 50 } },
               { source: assets.interestDeco3, style: { right: 48, bottom: 4, width: 60, height: 40, opacity: 0.6 } },
             ]} />
-            <TouchableOpacity style={[s.suggestBtn, tagShadow]} activeOpacity={0.7}>
-              <Text style={[T.body14, { color: C.muted }]}>Suggest interests</Text>
+
+            {/* Footer CTA */}
+            <Text style={[T.body14, { color: C.muted, textAlign: "center", marginTop: 20 }]}>
+              Develop new interests with us?
+            </Text>
+            <TouchableOpacity style={s.suggestBtn} onPressIn={haptic} activeOpacity={0.8}>
+              <Text style={[T.body14b, { color: C.primary }]}>Suggest interests</Text>
             </TouchableOpacity>
           </View>
 
@@ -550,7 +559,7 @@ export default function HomeScreen() {
       </SafeAreaView>
 
       {/* Outside SafeAreaView — sits flush at the true bottom of the screen */}
-      <BottomTabBar />
+      <BottomTabBar activeTab={activeTab} onTabPress={onTabPress} />
     </View>
   );
 }
@@ -684,7 +693,7 @@ const s = StyleSheet.create({
   topicCard: {
     width: 192, backgroundColor: C.white,
     borderRadius: 24, padding: 16,
-    borderWidth: 2, borderColor: "transparent",
+    borderWidth: 1, borderColor: C.border,
     overflow: "hidden",
   },
   topicImageArea: {
@@ -717,7 +726,7 @@ const s = StyleSheet.create({
     flexDirection: "row", alignItems: "center", gap: 6,
     backgroundColor: C.white, borderRadius: 12,
     paddingHorizontal: 12, paddingVertical: 9,
-    borderWidth: 2, borderColor: C.border,
+    borderWidth: 1, borderColor: C.border,
   },
 
   // Practice card
@@ -726,7 +735,7 @@ const s = StyleSheet.create({
     width: 160, backgroundColor: C.white,
     borderRadius: 24, paddingHorizontal: 16, paddingVertical: 20,
     alignItems: "center",
-    borderWidth: 2, borderColor: "transparent",
+    borderWidth: 1, borderColor: C.border,
     overflow: "hidden",
   },
   practiceImageArea: {
@@ -760,10 +769,30 @@ const s = StyleSheet.create({
   interestDeco: {
     position: "absolute",
   },
+  // Interest frame — off-white container wrapping the whole interests section
+  interestFrame: {
+    marginTop: 28,
+    marginHorizontal: 16,
+    backgroundColor: C.offWhite,
+    borderRadius: 28,
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 24,
+  },
+  interestFrameCircle: {
+    width: 39,
+    height: 39,
+    marginBottom: 16,
+  },
+
   suggestBtn: {
-    marginTop: 16, alignSelf: "center",
-    borderWidth: 1, borderColor: C.border,
-    borderRadius: 40, paddingHorizontal: 20, paddingVertical: 10,
+    marginTop: 12,
+    alignSelf: "center",
+    borderWidth: 2,
+    borderColor: C.primary,
+    borderRadius: 40,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
     backgroundColor: C.white,
   },
 
@@ -773,7 +802,7 @@ const s = StyleSheet.create({
     backgroundColor: C.white,
     borderRadius: 24,
     overflow: "hidden",
-    borderWidth: 2, borderColor: "transparent",
+    borderWidth: 1, borderColor: C.border,
   },
   skillContent: {
     paddingHorizontal: 20,

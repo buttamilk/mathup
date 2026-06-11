@@ -14,9 +14,10 @@ import {
 } from "@expo-google-fonts/dm-sans";
 import { View, ActivityIndicator } from "react-native";
 import SplashScreen from "./src/screens/SplashScreen";
-import HomeScreen from "./src/screens/HomeScreen";
+import HomeScreen, { BottomTabBar, TabName } from "./src/screens/HomeScreen";
+import SearchScreen from "./src/screens/SearchScreen";
 
-type Screen = "splash" | "home";
+type AppScreen = "splash" | "main";
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -29,7 +30,8 @@ export default function App() {
     DMSans_700Bold,
   });
 
-  const [screen, setScreen] = React.useState<Screen>("splash");
+  const [appScreen, setAppScreen] = React.useState<AppScreen>("splash");
+  const [activeTab, setActiveTab] = React.useState<TabName>("Home");
 
   if (!fontsLoaded) {
     return (
@@ -39,15 +41,24 @@ export default function App() {
     );
   }
 
+  const tabBar = (
+    <BottomTabBar
+      activeTab={activeTab}
+      onTabPress={(tab) => setActiveTab(tab)}
+    />
+  );
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {screen === "splash" ? (
+      {appScreen === "splash" ? (
         <SplashScreen
-          onNewUser={() => setScreen("home")}
-          onReturningUser={() => setScreen("home")}
+          onNewUser={() => setAppScreen("main")}
+          onReturningUser={() => setAppScreen("main")}
         />
+      ) : activeTab === "Search" ? (
+        <SearchScreen bottomTabBar={tabBar} />
       ) : (
-        <HomeScreen />
+        <HomeScreen activeTab={activeTab} onTabPress={setActiveTab} />
       )}
     </GestureHandlerRootView>
   );
