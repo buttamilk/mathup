@@ -16,8 +16,25 @@ import { View, ActivityIndicator } from "react-native";
 import SplashScreen from "./src/screens/SplashScreen";
 import HomeScreen, { BottomTabBar, TabName } from "./src/screens/HomeScreen";
 import SearchScreen from "./src/screens/SearchScreen";
+import TopicDetailScreen from "./src/screens/TopicDetailScreen";
+import SuperskillsScreen, { SUPERSKILLS } from "./src/screens/SuperskillsScreen";
+import SuperskillDetailScreen from "./src/screens/SuperskillDetailScreen";
+import SuperskillArticleScreen from "./src/screens/SuperskillArticleScreen";
+import type { Superskill } from "./src/screens/SuperskillsScreen";
 
 type AppScreen = "splash" | "main";
+
+interface TopicRoute {
+  number: number;
+  title: string;
+  dot: "relevant" | "important" | "helpful";
+}
+
+const TOPIC_ROUTES: Record<number, TopicRoute> = {
+  1: { number: 1, title: "Exponential function & Logarithm", dot: "relevant" },
+  2: { number: 2, title: "Data & Probability",               dot: "important" },
+  3: { number: 3, title: "Geometry & Shapes",                dot: "helpful" },
+};
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -32,6 +49,9 @@ export default function App() {
 
   const [appScreen, setAppScreen] = React.useState<AppScreen>("splash");
   const [activeTab, setActiveTab] = React.useState<TabName>("Home");
+  const [activeTopic, setActiveTopic] = React.useState<number | null>(null);
+  const [activeSkill, setActiveSkill] = React.useState<Superskill | null>(null);
+  const [articleSkill, setArticleSkill] = React.useState<Superskill | null>(null);
 
   if (!fontsLoaded) {
     return (
@@ -55,10 +75,40 @@ export default function App() {
           onNewUser={() => setAppScreen("main")}
           onReturningUser={() => setAppScreen("main")}
         />
+      ) : articleSkill !== null ? (
+        <SuperskillArticleScreen
+          skill={articleSkill}
+          onClose={() => { setArticleSkill(null); setActiveSkill(null); }}
+          bottomTabBar={tabBar}
+        />
+      ) : activeSkill !== null ? (
+        <SuperskillDetailScreen
+          skill={activeSkill}
+          onClose={() => setActiveSkill(null)}
+          onLetsGo={() => { setArticleSkill(activeSkill); setActiveSkill(null); }}
+          bottomTabBar={tabBar}
+        />
+      ) : activeTopic !== null && TOPIC_ROUTES[activeTopic] ? (
+        <TopicDetailScreen
+          {...TOPIC_ROUTES[activeTopic]}
+          onBack={() => setActiveTopic(null)}
+          bottomTabBar={tabBar}
+        />
       ) : activeTab === "Search" ? (
         <SearchScreen bottomTabBar={tabBar} />
+      ) : activeTab === "Superskills" ? (
+        <SuperskillsScreen
+          onSkillPress={(skill) => setActiveSkill(skill)}
+          bottomTabBar={tabBar}
+        />
       ) : (
-        <HomeScreen activeTab={activeTab} onTabPress={setActiveTab} />
+        <HomeScreen
+          activeTab={activeTab}
+          onTabPress={setActiveTab}
+          onTopicPress={(n) => setActiveTopic(n)}
+          onSkillPress={(id) => setActiveSkill(SUPERSKILLS.find((s) => s.id === id) ?? null)}
+          onAllSkills={() => setActiveTab("Superskills")}
+        />
       )}
     </GestureHandlerRootView>
   );

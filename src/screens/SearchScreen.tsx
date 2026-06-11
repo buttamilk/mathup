@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,10 +9,13 @@ import {
   StatusBar,
   Platform,
   SafeAreaView,
+  Modal,
+  Animated,
+  Easing,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { C, T, tagShadow } from "../theme";
+import { C, T, tagShadow, activePillStyle } from "../theme";
 import { MATH_TOPICS, POPULAR, GAP_TOPICS, MathTopic } from "../data/mathTopics";
 
 const haptic = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -31,30 +34,27 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
   );
 }
 
-// ─── Type icon: book = article, play = video ───────────────────────────────────
-function TypeIcon({ type }: { type: MathTopic["type"] }) {
-  return (
-    <View style={s.typeIcon}>
-      <Ionicons
-        name={type === "video" ? "play" : "book-outline"}
-        size={13}
-        color={C.text}
-      />
-    </View>
-  );
-}
-
 // ─── Static chip (popular / gap) ──────────────────────────────────────────────
-function SearchChip({ topic, onPress }: { topic: MathTopic; onPress: (t: MathTopic) => void }) {
+function SearchChip({ topic, active = false, onPress }: {
+  topic: MathTopic; active?: boolean; onPress: (t: MathTopic) => void;
+}) {
   return (
     <TouchableOpacity
-      style={[s.chip, tagShadow]}
+      style={[s.chip, tagShadow, active && activePillStyle]}
       activeOpacity={0.8}
       onPressIn={haptic}
       onPress={() => onPress(topic)}
     >
-      <TypeIcon type={topic.type} />
-      <Text style={[T.body14, { color: C.text }]} numberOfLines={1}>{topic.title}</Text>
+      <View style={[s.typeIcon, active && { borderColor: C.white }]}>
+        <Ionicons
+          name={topic.type === "video" ? "play" : "book-outline"}
+          size={13}
+          color={active ? C.white : C.text}
+        />
+      </View>
+      <Text style={[T.body14, { color: active ? C.white : C.text }]} numberOfLines={1}>
+        {topic.title}
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -70,13 +70,89 @@ function ResultRow({ topic, query, onPress }: {
       onPressIn={haptic}
       onPress={() => onPress(topic)}
     >
-      <TypeIcon type={topic.type} />
+      <View style={s.typeIcon}>
+        <Ionicons name={topic.type === "video" ? "play" : "book-outline"} size={13} color={C.muted} />
+      </View>
       <View style={s.resultTextCol}>
         <HighlightedText text={topic.title} query={query} />
         <Text style={s.resultCategory}>{topic.category}</Text>
       </View>
       <Ionicons name="arrow-forward" size={16} color={C.muted} />
     </TouchableOpacity>
+  );
+}
+
+// ─── Pulsing ring component ───────────────────────────────────────────────────
+function PulseRing({ delay, size }: { delay: number; size: number }) {
+  const scale   = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(0.5)).current;
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      Animated.loop(
+        Animated.parallel([
+          Animated.timing(scale,   { toValue: 2.4, duration: 1600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0,   duration: 1600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        ])
+      ).start();
+    }, delay);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        width: size, height: size,
+        borderRadius: size / 2,
+        backgroundColor: C.primary,
+        opacity,
+        transform: [{ scale }],
+      }}
+    />
+  );
+}
+
+// ─── Voice overlay ────────────────────────────────────────────────────────────
+function VoiceOverlay({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: visible ? 1 : 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [visible]);
+
+  if (!visible) return null;
+
+  return (
+    <Modal transparent animationType="none" visible={visible} onRequestClose={onDismiss}>
+      <Animated.View style={[s.overlayBg, { opacity: fadeAnim }]}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onDismiss}>
+          <View style={s.overlayCenter} pointerEvents="box-none">
+
+            {/* Rings behind mic — all centred in the same space */}
+            <View style={s.micWrap}>
+              <PulseRing delay={0}   size={80} />
+              <PulseRing delay={400} size={80} />
+              <PulseRing delay={800} size={80} />
+              {/* Mic button on top */}
+              <View style={s.micCircle}>
+                <Ionicons name="mic" size={32} color={C.white} />
+              </View>
+            </View>
+
+            {/* Labels */}
+            <Text style={s.listeningLabel}>Listening…</Text>
+            <Text style={s.listeningHint}>Tap anywhere to dismiss</Text>
+
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    </Modal>
   );
 }
 
@@ -87,6 +163,7 @@ interface Props {
 
 export default function SearchScreen({ bottomTabBar }: Props) {
   const [query, setQuery] = useState("");
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
   const results = query.trim().length > 0
@@ -104,8 +181,13 @@ export default function SearchScreen({ bottomTabBar }: Props) {
 
   const handleMic = () => {
     haptic();
-    // Focuses the input — iOS keyboard dictation mic is then available bottom-left
-    inputRef.current?.focus();
+    setVoiceOpen(true);
+  };
+
+  const dismissVoice = () => {
+    setVoiceOpen(false);
+    // After overlay closes, focus input so iOS keyboard dictation is ready
+    setTimeout(() => inputRef.current?.focus(), 260);
   };
 
   const clearQuery = () => {
@@ -157,7 +239,7 @@ export default function SearchScreen({ bottomTabBar }: Props) {
                 <Text style={s.sectionLabel}>Popular searches:</Text>
                 <View style={s.chipWrap}>
                   {POPULAR.map((t) => (
-                    <SearchChip key={t.id} topic={t} onPress={handleChipPress} />
+                    <SearchChip key={t.id} topic={t} active={query === t.title} onPress={handleChipPress} />
                   ))}
                 </View>
               </View>
@@ -166,7 +248,7 @@ export default function SearchScreen({ bottomTabBar }: Props) {
                 <Text style={s.sectionLabel}>Common knowledge gaps:</Text>
                 <View style={s.chipWrap}>
                   {GAP_TOPICS.map((t) => (
-                    <SearchChip key={t.id} topic={t} onPress={handleChipPress} />
+                    <SearchChip key={t.id} topic={t} active={query === t.title} onPress={handleChipPress} />
                   ))}
                 </View>
               </View>
@@ -199,6 +281,7 @@ export default function SearchScreen({ bottomTabBar }: Props) {
         </ScrollView>
       </SafeAreaView>
 
+      <VoiceOverlay visible={voiceOpen} onDismiss={dismissVoice} />
       {bottomTabBar}
     </View>
   );
@@ -231,8 +314,7 @@ const s = StyleSheet.create({
 
   section: {
     paddingHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 8,
+    marginTop: 40,
   },
   sectionLabel: {
     fontFamily: "Karla_400Regular",
@@ -262,8 +344,8 @@ const s = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 6,
-    borderWidth: 1.5,
-    borderColor: C.text,
+    borderWidth: 1,
+    borderColor: C.muted,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -310,5 +392,42 @@ const s = StyleSheet.create({
     marginTop: 80,
     alignItems: "center",
     paddingHorizontal: 40,
+  },
+
+  // Voice overlay
+  overlayBg: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.80)",
+  },
+  overlayCenter: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  micWrap: {
+    width: 80, height: 80,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  micCircle: {
+    position: "absolute",
+    width: 80, height: 80,
+    borderRadius: 40,
+    backgroundColor: C.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  listeningLabel: {
+    fontFamily: "Karla_700Bold",
+    fontSize: 20,
+    color: "#FFFFFF",
+    marginTop: 28,
+    letterSpacing: 0.2,
+  },
+  listeningHint: {
+    fontFamily: "Karla_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.5)",
+    marginTop: 8,
   },
 });

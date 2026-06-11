@@ -16,6 +16,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { C, T, cardShadow, tagShadow, activeCardStyle, activePillStyle } from "../theme";
+import { MATH_TOPICS } from "../data/mathTopics";
 
 const haptic = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -77,33 +78,38 @@ function SectionHeader({ title, onAll }: { title: string; onAll?: () => void }) 
 }
 
 // ─── Timer option button with press-in scale animation ─────────────────────────
-function TimerOptionBtn({ opt, isSelected, onPress }: {
+function TimerOptionBtn({ opt, isSelected, onPress, appearAnim }: {
   opt: { label: string; minutes: number };
   isSelected: boolean;
   onPress: () => void;
+  appearAnim: Animated.Value;
 }) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const onPressIn  = () => { haptic(); Animated.spring(scale, { toValue: 1.22, useNativeDriver: true, tension: 120, friction: 3 }).start(); };
-  const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 100, friction: 3 }).start();
+  const wobble = useRef(new Animated.Value(1)).current;
+  const onPressIn  = () => { haptic(); Animated.spring(wobble, { toValue: 1.22, useNativeDriver: true, tension: 120, friction: 3 }).start(); };
+  const onPressOut = () => Animated.spring(wobble, { toValue: 1, useNativeDriver: true, tension: 100, friction: 3 }).start();
 
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <TouchableOpacity
-        style={[s.timerOptionBtn, isSelected && s.timerOptionBtnSelected]}
-        onPress={onPress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        activeOpacity={1}
-      >
-        {opt.minutes !== -1 ? (
-          <>
-            <Image source={stopwatchIcon} style={{ width: 22, height: 22, tintColor: C.white }} resizeMode="contain" />
-            <Text style={[s.timerOptionLabel, { marginTop: 4 }]}>{opt.label}</Text>
-          </>
-        ) : (
-          <Text style={[s.timerOptionLabel, { fontSize: 20, letterSpacing: 2 }]}>···</Text>
-        )}
-      </TouchableOpacity>
+    // Outer: staggered appear (scale + fade). Inner: press wobble.
+    // Both use native driver — no layout props on either node.
+    <Animated.View style={{ transform: [{ scale: appearAnim }], opacity: appearAnim }}>
+      <Animated.View style={{ transform: [{ scale: wobble }] }}>
+        <TouchableOpacity
+          style={[s.timerOptionBtn, isSelected && s.timerOptionBtnSelected]}
+          onPress={onPress}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          activeOpacity={1}
+        >
+          {opt.minutes !== -1 ? (
+            <>
+              <Image source={stopwatchIcon} style={{ width: 22, height: 22, tintColor: C.white }} resizeMode="contain" />
+              <Text style={[s.timerOptionLabel, { marginTop: 4 }]}>{opt.label}</Text>
+            </>
+          ) : (
+            <Text style={[s.timerOptionLabel, { fontSize: 20, letterSpacing: 2 }]}>···</Text>
+          )}
+        </TouchableOpacity>
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -118,6 +124,36 @@ const TIMER_OPTIONS = [
 const TIMER_ROW_HEIGHT = 96; // enough for 56pt button + label
 
 // ─── Header ────────────────────────────────────────────────────────────────────
+// Map refresh labels to their type from the dataset (fallback: article)
+const REFRESH_TOPICS: { label: string; type: "article" | "video" }[] = [
+  { label: "Basics",               type: "article" },
+  { label: "Point of origin",      type: "video"   },
+  { label: "Pie chart",            type: "article" },
+  { label: "Geometry Shapes",      type: "article" },
+  { label: "Probability Trees",    type: "article" },
+  { label: "Compound interest",    type: "video"   },
+  { label: "Tangents",             type: "article" },
+  { label: "Correlation analysis", type: "article" },
+];
+
+function RefreshChips() {
+  return (
+    <View style={s.section}>
+      <SectionHeader title="Suggested topics to refresh:" onAll={() => {}} />
+      <View style={s.chipGrid}>
+        {REFRESH_TOPICS.map(({ label, type }) => (
+          <BasicChip
+            key={label}
+            label={label}
+            type={type}
+            onPress={() => haptic()}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function Header({ name }: { name: string }) {
   const [timerOpen, setTimerOpen] = React.useState(false);
   const [selectedMinutes, setSelectedMinutes] = React.useState<number | null>(null);
@@ -127,6 +163,19 @@ function Header({ name }: { name: string }) {
 
   // Height-only animation — useNativeDriver MUST be false for layout props.
   const heightAnim = useRef(new Animated.Value(0)).current;
+
+  // One Animated.Value per circle: indices 0-3 = options (10m,20m,30m,···), index 4 = X.
+  // All start at 0 (invisible). Created once — never recreated.
+  const STAGGER_MS = 50;
+  const NUM_CIRCLES = TIMER_OPTIONS.length + 1; // 4 options + 1 close = 5
+  const appearAnims = useRef(
+    Array.from({ length: NUM_CIRCLES }, () => new Animated.Value(0))
+  ).current;
+
+  const springIn  = (anim: Animated.Value) =>
+    Animated.spring(anim, { toValue: 1, useNativeDriver: true, tension: 200, friction: 15 });
+  const springOut = (anim: Animated.Value) =>
+    Animated.spring(anim, { toValue: 0, useNativeDriver: true, tension: 200, friction: 15 });
 
   // Start/restart the countdown whenever a new duration is chosen
   React.useEffect(() => {
@@ -153,18 +202,38 @@ function Header({ name }: { name: string }) {
     return `${m}:${s}`;
   };
 
+  // Fire stagger AFTER timerOpen:true causes the circles to mount.
+  // useEffect runs post-render, so all Animated.Views are guaranteed to exist.
+  React.useEffect(() => {
+    if (timerOpen) {
+      [...appearAnims].reverse().forEach((anim, i) => {
+        setTimeout(() => springIn(anim).start(), i * STAGGER_MS);
+      });
+    }
+  }, [timerOpen]);
+
   const openTimer = () => {
-    setTimerOpen(true);
+    appearAnims.forEach((a) => a.setValue(0));
+    setTimerOpen(true); // triggers the useEffect above once mounted
     Animated.spring(heightAnim, { toValue: TIMER_ROW_HEIGHT, useNativeDriver: false, tension: 70, friction: 12 }).start();
   };
 
   const closeTimer = () => {
-    Animated.spring(heightAnim, { toValue: 0, useNativeDriver: false, tension: 70, friction: 12 }).start(() => setTimerOpen(false));
+    // Left→right: index 0 (10m) first, index 4 (X) last
+    appearAnims.forEach((anim, i) => {
+      setTimeout(() => springOut(anim).start(), i * STAGGER_MS);
+    });
+    // Collapse height only after the last circle finishes
+    setTimeout(() => {
+      Animated.spring(heightAnim, { toValue: 0, useNativeDriver: false, tension: 70, friction: 12 })
+        .start(() => setTimerOpen(false));
+    }, NUM_CIRCLES * STAGGER_MS);
   };
 
   const selectTimer = (minutes: number) => {
     setSelectedMinutes(minutes === -1 ? 0 : minutes);
-    // Close immediately so the pill appears at once, accordion animates away in background
+    // Instant — pill appears with no delay
+    appearAnims.forEach((a) => a.setValue(0));
     setTimerOpen(false);
     Animated.spring(heightAnim, { toValue: 0, useNativeDriver: false, tension: 70, friction: 12 }).start();
   };
@@ -182,19 +251,25 @@ function Header({ name }: { name: string }) {
             Plain View clips overflow; Animated.View drives height only (JS driver). ── */}
       <View style={s.timerRowClip}>
         <Animated.View style={[s.timerRowInner, { height: heightAnim }]}>
-          {TIMER_OPTIONS.map((opt) => (
+          {TIMER_OPTIONS.map((opt, i) => (
             <TimerOptionBtn
               key={opt.label}
               opt={opt}
               isSelected={selectedMinutes === opt.minutes}
               onPress={() => selectTimer(opt.minutes)}
+              appearAnim={appearAnims[i]}
             />
           ))}
 
-          {/* Close — white circle with blue border */}
-          <TouchableOpacity style={s.timerCloseBtn} onPress={() => { haptic(); closeTimer(); }} activeOpacity={0.8}>
-            <Ionicons name="close" size={20} color={C.primary} />
-          </TouchableOpacity>
+          {/* Close — appears last, disappears first */}
+          <Animated.View style={{
+            transform: [{ scale: appearAnims[TIMER_OPTIONS.length] }],
+            opacity: appearAnims[TIMER_OPTIONS.length],
+          }}>
+            <TouchableOpacity style={s.timerCloseBtn} onPress={() => { haptic(); closeTimer(); }} activeOpacity={0.8}>
+              <Ionicons name="close" size={20} color={C.primary} />
+            </TouchableOpacity>
+          </Animated.View>
         </Animated.View>
       </View>
 
@@ -305,8 +380,8 @@ function TopicCard({
 }
 
 // ─── Basics chip ───────────────────────────────────────────────────────────────
-function BasicChip({ label, selected = false, onPress }: {
-  label: string; selected?: boolean; onPress?: () => void;
+function BasicChip({ label, type = "article", selected = false, onPress }: {
+  label: string; type?: "article" | "video"; selected?: boolean; onPress?: () => void;
 }) {
   const [pressed, setPressed] = React.useState(false);
   const active = selected || pressed;
@@ -318,6 +393,13 @@ function BasicChip({ label, selected = false, onPress }: {
       onPressIn={() => { haptic(); setPressed(true); }}
       onPressOut={() => setPressed(false)}
     >
+      <View style={[s.chipTypeIcon, active && { borderColor: C.white }]}>
+        <Ionicons
+          name={type === "video" ? "play" : "book-outline"}
+          size={13}
+          color={active ? C.white : C.muted}
+        />
+      </View>
       <Text style={[T.body14, active && { color: C.white }]}>{label}</Text>
     </TouchableOpacity>
   );
@@ -359,15 +441,15 @@ function InterestCard({ title, decos }: {
 }
 
 // ─── Super skill card ──────────────────────────────────────────────────────────
-function SuperSkillCard({ duration, title, illustration, imageStyle }: {
-  duration: string; title: string; illustration: any; imageStyle?: object;
+export function SuperSkillCard({ duration, title, illustration, imageStyle, onPress, dark = false }: {
+  duration: string; title: string; illustration: any; imageStyle?: object; onPress?: () => void; dark?: boolean;
 }) {
   return (
     <View style={[s.skillCardShadow, cardShadow]}>
-      <TouchableOpacity style={s.skillCard} activeOpacity={0.8} onPressIn={haptic}>
+      <TouchableOpacity style={[s.skillCard, dark && { backgroundColor: "#282828" }]} activeOpacity={0.8} onPressIn={haptic} onPress={onPress}>
         <View style={s.skillContent}>
-          <Text style={[T.body14, { color: C.muted, textAlign: "center", marginBottom: 6 }]}>{duration}</Text>
-          <Text style={[T.body16b, { textAlign: "center", lineHeight: 22 }]}>{title}</Text>
+          <Text style={[T.body14, { color: dark ? "rgba(255,255,255,0.7)" : C.muted, textAlign: "center", marginBottom: 6 }]}>{duration}</Text>
+          <Text style={[T.body16b, { textAlign: "center", lineHeight: 22, color: dark ? C.white : C.text }]}>{title}</Text>
         </View>
         <View style={s.skillIllustrationContainer}>
           <Image source={illustration} style={[s.skillIllustration, imageStyle]} resizeMode="cover" />
@@ -444,9 +526,12 @@ export function BottomTabBar({ activeTab = "Home", onTabPress }: BottomTabBarPro
 interface HomeScreenProps {
   activeTab?: TabName;
   onTabPress?: (tab: TabName) => void;
+  onTopicPress?: (topicNumber: number) => void;
+  onSkillPress?: (skillId: string) => void;
+  onAllSkills?: () => void;
 }
 
-export default function HomeScreen({ activeTab = "Home", onTabPress }: HomeScreenProps) {
+export default function HomeScreen({ activeTab = "Home", onTabPress, onTopicPress, onSkillPress, onAllSkills }: HomeScreenProps) {
   return (
     <View style={{ flex: 1, backgroundColor: C.pageBg }}>
       <StatusBar barStyle="dark-content" />
@@ -466,7 +551,7 @@ export default function HomeScreen({ activeTab = "Home", onTabPress }: HomeScree
 
           {/* Tasks by topic */}
           <View style={s.section}>
-            <SectionHeader title="Tasks by topic:" onAll={() => {}} />
+            <SectionHeader title="Learn by topic:" onAll={() => {}} />
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -474,7 +559,8 @@ export default function HomeScreen({ activeTab = "Home", onTabPress }: HomeScree
               style={s.hScroll}
             >
               <TopicCard icon={assets.topicIcon1} bgImage={assets.topicBg1} number={1}
-                title={"Quadratic functions\n& equations"} dot="relevant" />
+                title={"Exponential function\n& logarithm"} dot="relevant"
+                onPress={() => onTopicPress?.(1)} />
               <TopicCard icon={assets.topicIcon2} bgImage={assets.topicBg2} number={2}
                 title={"Data &\nprobability"} dot="important" />
               <TopicCard icon={assets.topicIcon3} bgImage={assets.topicBg3} number={3}
@@ -483,14 +569,7 @@ export default function HomeScreen({ activeTab = "Home", onTabPress }: HomeScree
           </View>
 
           {/* Refresh basics */}
-          <View style={s.section}>
-            <SectionHeader title="Suggested topics to refresh:" onAll={() => {}} />
-            <View style={s.chipGrid}>
-              {["Basics", "Point of origin", "Pie chart", "Geometry Shapes",
-                "Probability Trees", "Compound interest", "Tangents", "Correlation analysis"
-              ].map(label => <BasicChip key={label} label={label} />)}
-            </View>
-          </View>
+          <RefreshChips />
 
           {/* Practice tests */}
           <View style={s.section}>
@@ -513,7 +592,7 @@ export default function HomeScreen({ activeTab = "Home", onTabPress }: HomeScree
             <Image source={assets.blackCircle} style={s.interestFrameCircle} resizeMode="contain" />
 
             {/* Header */}
-            <SectionHeader title="For your interests:" onAll={() => {}} />
+            <SectionHeader title="Your topics of interest:" onAll={() => {}} />
 
             {/* Cards */}
             <InterestCard title="Sustainable investing" decos={[
@@ -531,26 +610,24 @@ export default function HomeScreen({ activeTab = "Home", onTabPress }: HomeScree
             ]} />
 
             {/* Footer CTA */}
-            <Text style={[T.body14, { color: C.muted, textAlign: "center", marginTop: 20 }]}>
-              Develop new interests with us?
-            </Text>
-            <TouchableOpacity style={s.suggestBtn} onPressIn={haptic} activeOpacity={0.8}>
-              <Text style={[T.body14b, { color: C.primary }]}>Suggest interests</Text>
+            <TouchableOpacity style={[s.suggestBtn, tagShadow]} onPressIn={haptic} activeOpacity={0.8}>
+              <Text style={[T.body14b, { color: C.text }]}>Suggest interests</Text>
             </TouchableOpacity>
           </View>
 
           {/* Learn super skills */}
           <View style={s.section}>
-            <SectionHeader title="Learn super skills:" onAll={() => {}} />
+            <SectionHeader title="Learn super skills:" onAll={onAllSkills} />
             {/* Stress: render taller than container, shift up to reveal bottom (person + bike) */}
             <SuperSkillCard duration="5 min"
-              title="Introduction to dealing with stress"
+              title="Little intro to stress management"
               illustration={assets.skillStress}
-              imageStyle={{ height: 277, marginTop: -77 }} />
+              imageStyle={{ height: 277, marginTop: -77 }}
+              onPress={() => onSkillPress?.("stress")} />
             <View style={{ height: 16 }} />
             {/* Pizza: fill container height exactly, no gap */}
             <SuperSkillCard duration="5 min"
-              title="4 easy-peasy learning methods to try out"
+              title="4 easy-peasy learning methods to try"
               illustration={assets.skillPizza}
               imageStyle={{ height: 200 }} />
 
@@ -723,10 +800,15 @@ const s = StyleSheet.create({
   // Basics chips
   chipGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
-    flexDirection: "row", alignItems: "center", gap: 6,
+    flexDirection: "row", alignItems: "center", gap: 8,
     backgroundColor: C.white, borderRadius: 12,
-    paddingHorizontal: 12, paddingVertical: 9,
+    paddingHorizontal: 12, paddingVertical: 10,
     borderWidth: 1, borderColor: C.border,
+  },
+  chipTypeIcon: {
+    width: 26, height: 26, borderRadius: 6,
+    borderWidth: 1, borderColor: C.muted,
+    alignItems: "center", justifyContent: "center",
   },
 
   // Practice card
@@ -786,13 +868,13 @@ const s = StyleSheet.create({
   },
 
   suggestBtn: {
-    marginTop: 12,
+    marginTop: 20,
     alignSelf: "center",
-    borderWidth: 2,
-    borderColor: C.primary,
-    borderRadius: 40,
-    paddingHorizontal: 28,
-    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     backgroundColor: C.white,
   },
 

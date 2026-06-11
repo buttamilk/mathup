@@ -62,8 +62,6 @@ export const tagShadow = {
  * default style so no layout shift happens on state change.
  */
 export const activeCardStyle = {
-  borderWidth:  2,
-  borderColor:  C.primary,
   backgroundColor: C.activeBg,
 } as const;
 
