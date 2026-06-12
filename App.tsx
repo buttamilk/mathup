@@ -17,10 +17,13 @@ import SplashScreen from "./src/screens/SplashScreen";
 import HomeScreen, { BottomTabBar, TabName } from "./src/screens/HomeScreen";
 import SearchScreen from "./src/screens/SearchScreen";
 import TopicDetailScreen from "./src/screens/TopicDetailScreen";
+import TaskDetailScreen from "./src/screens/TaskDetailScreen";
+import ExerciseSummaryScreen from "./src/screens/ExerciseSummaryScreen";
 import SuperskillsScreen, { SUPERSKILLS } from "./src/screens/SuperskillsScreen";
 import SuperskillDetailScreen from "./src/screens/SuperskillDetailScreen";
 import SuperskillArticleScreen from "./src/screens/SuperskillArticleScreen";
 import type { Superskill } from "./src/screens/SuperskillsScreen";
+import type { Task } from "./src/screens/TopicDetailScreen";
 
 type AppScreen = "splash" | "main";
 
@@ -52,6 +55,8 @@ export default function App() {
   const [activeTopic, setActiveTopic] = React.useState<number | null>(null);
   const [activeSkill, setActiveSkill] = React.useState<Superskill | null>(null);
   const [articleSkill, setArticleSkill] = React.useState<Superskill | null>(null);
+  const [activeTask, setActiveTask] = React.useState<Task | null>(null);
+  const [showSummary, setShowSummary] = React.useState(false);
 
   if (!fontsLoaded) {
     return (
@@ -75,24 +80,39 @@ export default function App() {
           onNewUser={() => setAppScreen("main")}
           onReturningUser={() => setAppScreen("main")}
         />
+      ) : showSummary && activeTask !== null ? (
+        <ExerciseSummaryScreen
+          task={activeTask}
+          onClose={() => { setShowSummary(false); setActiveTask(null); }}
+          onKeepPractising={() => { setShowSummary(false); }}
+        />
+      ) : activeTask !== null ? (
+        <TaskDetailScreen
+          task={activeTask}
+          onClose={() => setActiveTask(null)}
+          onComplete={() => setShowSummary(true)}
+          bottomTabBar={null}
+        />
       ) : articleSkill !== null ? (
         <SuperskillArticleScreen
           skill={articleSkill}
           onClose={() => { setArticleSkill(null); setActiveSkill(null); }}
-          bottomTabBar={tabBar}
+          onBackToIntro={() => { setActiveSkill(articleSkill); setArticleSkill(null); }}
+          bottomTabBar={null}
         />
       ) : activeSkill !== null ? (
         <SuperskillDetailScreen
           skill={activeSkill}
           onClose={() => setActiveSkill(null)}
           onLetsGo={() => { setArticleSkill(activeSkill); setActiveSkill(null); }}
-          bottomTabBar={tabBar}
+          bottomTabBar={null}
         />
       ) : activeTopic !== null && TOPIC_ROUTES[activeTopic] ? (
         <TopicDetailScreen
           {...TOPIC_ROUTES[activeTopic]}
           onBack={() => setActiveTopic(null)}
-          bottomTabBar={tabBar}
+          onTaskPress={(task) => setActiveTask(task)}
+          bottomTabBar={null}
         />
       ) : activeTab === "Search" ? (
         <SearchScreen bottomTabBar={tabBar} />

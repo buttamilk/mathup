@@ -16,14 +16,18 @@ import { C, T, cardShadow, tagShadow, activePillStyle } from "../theme";
 const haptic = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
-type Difficulty = "easy" | "medium" | "hard" | "master";
+export type Difficulty = "easy" | "medium" | "hard" | "master";
 
-interface Task {
+// null = not attempted; "cold"=struggling 🥶, "mid"=progressing 😌, "master"=mastered 🤓
+export type CircleState = null | "cold" | "mid" | "master";
+
+export interface Task {
   id: string;
   title: string;
   difficulty: Difficulty;
   duration: number;   // minutes
   relevance: number;  // percent
+  circles: [CircleState, CircleState, CircleState];
 }
 
 const DIFFICULTY_EMOJI: Record<Difficulty, string> = {
@@ -35,21 +39,21 @@ const DIFFICULTY_EMOJI: Record<Difficulty, string> = {
 
 
 const TASKS: Task[] = [
-  { id: "t1", title: "Build functions (Exponential function)",        difficulty: "easy",   duration: 3,  relevance: 87 },
-  { id: "t2", title: "Interpret graph (Power function)",              difficulty: "easy",   duration: 5,  relevance: 87 },
-  { id: "t3", title: "Solve equations (Exponential function)",        difficulty: "medium", duration: 7,  relevance: 24 },
-  { id: "t4", title: "Mental math (Logarithm)",                       difficulty: "medium", duration: 7,  relevance: 82 },
-  { id: "t5", title: "Calculate compound interest (Exp. function)",   difficulty: "hard",   duration: 8,  relevance: 87 },
-  { id: "t6", title: "Calculate investment time (Exp. function)",     difficulty: "hard",   duration: 10, relevance: 87 },
-  { id: "t7", title: "Compare growth rates (Exponential function)",   difficulty: "master", duration: 15, relevance: 87 },
+  { id: "t1", title: "Build functions (Exponential function)",        difficulty: "easy",   duration: 8,  relevance: 87, circles: [null, "mid",    null    ] },
+  { id: "t2", title: "Interpret graph (Power function)",              difficulty: "easy",   duration: 10, relevance: 87, circles: ["cold", null,  null    ] },
+  { id: "t3", title: "Solve equations (Exponential function)",        difficulty: "medium", duration: 12, relevance: 24, circles: [null,  null,   "master"] },
+  { id: "t4", title: "Mental math (Logarithm)",                       difficulty: "medium", duration: 13, relevance: 82, circles: [null,  null,   "master"] },
+  { id: "t5", title: "Calculate compound interest (Exp. function)",   difficulty: "hard",   duration: 15, relevance: 87, circles: [null,  null,   null    ] },
+  { id: "t6", title: "Calculate investment time (Exp. function)",     difficulty: "hard",   duration: 17, relevance: 87, circles: [null,  null,   null    ] },
+  { id: "t7", title: "Compare growth rates (Exponential function)",   difficulty: "master", duration: 20, relevance: 87, circles: [null,  null,   null    ] },
 ];
 
 const SKILLS = [
   { id: "s1", label: "Introduction",               type: "article" as const },
-  { id: "s2", label: "X-Intercepts",               type: "video"   as const },
+  { id: "s2", label: "X-intercepts",               type: "video"   as const },
   { id: "s3", label: "Pie chart",                  type: "article" as const },
   { id: "s4", label: "Local minimum",              type: "article" as const },
-  { id: "s5", label: "Rearranging terms: Factoring out", type: "video" as const },
+  { id: "s5", label: "Rearranging terms: factoring out", type: "video" as const },
 ];
 
 const FILTERS: { key: Difficulty | "all"; label: string; emoji: string }[] = [
@@ -63,12 +67,22 @@ const dotRelevantAsset = require("../../assets/cards/dot-relevant.png");
 const interestDeco     = require("../../assets/cards/interest-deco1a.png");
 const trophyAsset      = require("../../assets/cards/trophy.png");
 
-// ─── Completion circles (3 empty slots = not started) ─────────────────────────
-function CompletionCircles() {
+// ─── Completion circles ────────────────────────────────────────────────────────
+const CIRCLE_EMOJI: Record<NonNullable<CircleState>, string> = {
+  cold:   "🥶",
+  mid:    "😌",
+  master: "🤓",
+};
+
+function CompletionCircles({ circles }: { circles: [CircleState, CircleState, CircleState] }) {
   return (
     <View style={s.circles}>
-      {[0, 1, 2].map((i) => (
-        <View key={i} style={s.circle} />
+      {circles.map((state, i) => (
+        <View key={i} style={[s.circle, !state && s.circleEmpty]}>
+          {state && (
+            <Text style={s.circleEmoji}>{CIRCLE_EMOJI[state]}</Text>
+          )}
+        </View>
       ))}
     </View>
   );
@@ -78,21 +92,23 @@ function CompletionCircles() {
 function SkillChip({ label, type, onPress }: {
   label: string; type: "article" | "video"; onPress: () => void;
 }) {
+  const [pressed, setPressed] = React.useState(false);
   return (
     <TouchableOpacity
-      style={[s.skillChip, tagShadow]}
-      activeOpacity={0.75}
-      onPressIn={haptic}
+      style={[s.skillChip, tagShadow, pressed && activePillStyle]}
+      activeOpacity={1}
       onPress={onPress}
+      onPressIn={() => { haptic(); setPressed(true); }}
+      onPressOut={() => setPressed(false)}
     >
-      <View style={s.skillChipIcon}>
+      <View style={[s.skillChipIcon, pressed && { borderColor: C.white }]}>
         <Ionicons
           name={type === "video" ? "play" : "book-outline"}
           size={12}
-          color={C.muted}
+          color={pressed ? C.white : C.muted}
         />
       </View>
-      <Text style={[T.body14, { color: C.text }]} numberOfLines={1}>
+      <Text style={[T.body14, { color: pressed ? C.white : C.text }]} numberOfLines={1}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -100,9 +116,9 @@ function SkillChip({ label, type, onPress }: {
 }
 
 // ─── Task row ─────────────────────────────────────────────────────────────────
-function TaskRow({ task }: { task: Task }) {
+function TaskRow({ task, onPress }: { task: Task; onPress: () => void }) {
   return (
-    <TouchableOpacity style={s.taskRow} activeOpacity={0.8} onPressIn={haptic}>
+    <TouchableOpacity style={s.taskRow} activeOpacity={0.8} onPressIn={haptic} onPress={onPress}>
       <View style={s.taskMain}>
         {/* Difficulty emoji + title */}
         <View style={s.taskTitleRow}>
@@ -117,7 +133,7 @@ function TaskRow({ task }: { task: Task }) {
           <Text style={[T.body14, { color: C.muted }]}>{task.relevance}% relevant</Text>
         </View>
       </View>
-      <CompletionCircles />
+      <CompletionCircles circles={task.circles} />
     </TouchableOpacity>
   );
 }
@@ -128,10 +144,11 @@ interface Props {
   title: string;
   dot: "relevant" | "important" | "helpful";
   onBack: () => void;
+  onTaskPress: (task: Task) => void;
   bottomTabBar: React.ReactNode;
 }
 
-export default function TopicDetailScreen({ number, title, dot, onBack, bottomTabBar }: Props) {
+export default function TopicDetailScreen({ number, title, dot, onBack, onTaskPress, bottomTabBar }: Props) {
   const [activeFilter, setActiveFilter] = useState<Difficulty | "all">("all");
 
   const filteredTasks = activeFilter === "all"
@@ -151,8 +168,8 @@ export default function TopicDetailScreen({ number, title, dot, onBack, bottomTa
 
         {/* ── Nav bar ── */}
         <View style={s.navBar}>
-          <TouchableOpacity onPress={() => { haptic(); onBack(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={24} color={C.text} />
+          <TouchableOpacity style={s.closeBtn} onPress={() => { haptic(); onBack(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close" size={20} color={C.text} />
           </TouchableOpacity>
           <View style={s.relevanceTag}>
             <Text style={[T.body14, { color: C.muted }]}>{dotLabel[dot]}</Text>
@@ -197,9 +214,10 @@ export default function TopicDetailScreen({ number, title, dot, onBack, bottomTa
           <View style={s.section}>
             <Text style={T.h16}>Tasks:</Text>
 
-            {/* Difficulty filter */}
+            {/* Difficulty filter — paddingVertical gives shadows room to breathe */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false}
-              contentContainerStyle={s.filterRow}>
+              contentContainerStyle={s.filterRow}
+              style={{ overflow: "visible" }}>
               {FILTERS.map((f) => {
                 const isActive = activeFilter === f.key;
                 return (
@@ -221,21 +239,21 @@ export default function TopicDetailScreen({ number, title, dot, onBack, bottomTa
             <View style={[s.taskList, cardShadow]}>
               {filteredTasks.map((task, i) => (
                 <View key={task.id}>
-                  <TaskRow task={task} />
+                  <TaskRow task={task} onPress={() => onTaskPress(task)} />
                   {i < filteredTasks.length - 1 && <View style={s.taskDivider} />}
                 </View>
               ))}
             </View>
           </View>
 
-          {/* ── Past exam challenge ── */}
+          {/* ── Exam challenge ── */}
           <View style={s.px}>
             <TouchableOpacity style={[s.examChallenge, cardShadow]} activeOpacity={0.8} onPressIn={haptic}>
               <View style={s.examLeft}>
                 <Image source={trophyAsset} style={{ width: 22, height: 22 }} resizeMode="contain" />
-                <Text style={[T.body16b, { color: C.primary, marginLeft: 8 }]}>Past exam challenge</Text>
+                <Text style={[T.body16b, { color: C.primary, marginLeft: 8 }]}>Exam challenge</Text>
               </View>
-              <CompletionCircles />
+              <CompletionCircles circles={[null, null, null]} />
             </TouchableOpacity>
           </View>
 
@@ -256,6 +274,15 @@ const s = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  closeBtn: {
+    width: 36, height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.white,
+    alignItems: "center",
+    justifyContent: "center",
   },
   relevanceTag: {
     flexDirection: "row",
@@ -325,6 +352,7 @@ const s = StyleSheet.create({
   filterRow: {
     gap: 10,
     paddingRight: 16,
+    paddingVertical: 4,   // room for shadow below and above chips
   },
   filterChip: {
     flexDirection: "row",
@@ -383,9 +411,19 @@ const s = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: C.border,
     backgroundColor: "#F9F9F9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // Not-yet-attempted circles: keep shape, fade to 35% so they read as "empty"
+  circleEmpty: {
+    opacity: 0.35,
+  },
+  circleEmoji: {
+    fontSize: 16,
+    lineHeight: 20,
   },
 
-  // Past exam challenge
+  // Exam challenge
   examChallenge: {
     backgroundColor: C.white,
     borderRadius: 20,

@@ -50,7 +50,7 @@ export const SUPERSKILLS: Superskill[] = [
   {
     id: "sleep",
     duration: "5 min",
-    title: "Why Sleeping More Might Improve Your Grades",
+    title: "Why sleeping more might improve your grades",
     image: imgSleep,
     imageStyle: { height: 240, marginTop: -40 },
     dark: true,

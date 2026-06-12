@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { C, T, tagShadow } from "../theme";
+import { C, T } from "../theme";
 import type { Superskill } from "./SuperskillsScreen";
 
 const haptic = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -47,7 +47,7 @@ const INTRO: Record<string, IntroContent> = {
   },
   sleep: {
     category: "Health & Performance",
-    title: "Why Sleeping More Might Improve Your Grades",
+    title: "Why sleeping more might improve your grades",
     duration: "5min",
     body: "Sleep is one of the most underrated study tools. Learn how deep sleep consolidates memory, what happens in your brain overnight, and simple habits to improve your sleep quality.",
     bold: "deep sleep consolidates memory",
@@ -160,7 +160,7 @@ export default function SuperskillDetailScreen({ skill, onClose, onLetsGo, botto
               <Text style={[T.body14, { color: C.muted, marginLeft: 4 }]}>{content.duration}</Text>
             </View>
             <TouchableOpacity
-              style={[s.letsGoBtn, tagShadow]}
+              style={s.letsGoBtn}
               activeOpacity={0.85}
               onPressIn={haptic}
               onPress={() => { haptic(); onLetsGo(); }}
@@ -224,7 +224,7 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
   progressFill: {
-    width: "12%",
+    width: "25%",
     height: 6,
     backgroundColor: C.primary,
     borderRadius: 3,
@@ -304,13 +304,16 @@ const s = StyleSheet.create({
     paddingHorizontal: 28,
     paddingVertical: 14,
     borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: C.primary,
-    backgroundColor: C.white,
+    backgroundColor: C.primary,
+    shadowColor: "#CACACA",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
   },
   letsGoBtnText: {
     fontFamily: "Karla_700Bold",
     fontSize: 16,
-    color: C.primary,
+    color: C.white,
   },
 });

@@ -129,8 +129,8 @@ const REFRESH_TOPICS: { label: string; type: "article" | "video" }[] = [
   { label: "Basics",               type: "article" },
   { label: "Point of origin",      type: "video"   },
   { label: "Pie chart",            type: "article" },
-  { label: "Geometry Shapes",      type: "article" },
-  { label: "Probability Trees",    type: "article" },
+  { label: "Geometry shapes",      type: "article" },
+  { label: "Probability trees",    type: "article" },
   { label: "Compound interest",    type: "video"   },
   { label: "Tangents",             type: "article" },
   { label: "Correlation analysis", type: "article" },
@@ -202,31 +202,31 @@ function Header({ name }: { name: string }) {
     return `${m}:${s}`;
   };
 
-  // Fire stagger AFTER timerOpen:true causes the circles to mount.
-  // useEffect runs post-render, so all Animated.Views are guaranteed to exist.
-  React.useEffect(() => {
-    if (timerOpen) {
-      [...appearAnims].reverse().forEach((anim, i) => {
-        setTimeout(() => springIn(anim).start(), i * STAGGER_MS);
-      });
-    }
-  }, [timerOpen]);
+  // The timer circles are ALWAYS mounted (clipped by overflow:hidden on the height accordion,
+  // never conditionally rendered). So we can call the stagger directly — no useEffect needed.
+  // This also eliminates the race condition where setTimerOpen(true) is a no-op if timerOpen
+  // is already true (e.g. user re-opens before the close animation finishes).
 
   const openTimer = () => {
     appearAnims.forEach((a) => a.setValue(0));
-    setTimerOpen(true); // triggers the useEffect above once mounted
+    setTimerOpen(true);
     Animated.spring(heightAnim, { toValue: TIMER_ROW_HEIGHT, useNativeDriver: false, tension: 70, friction: 12 }).start();
+    // Stagger right→left: X (index 4) first, 10m (index 0) last
+    [...appearAnims].reverse().forEach((anim, i) => {
+      setTimeout(() => springIn(anim).start(), i * STAGGER_MS);
+    });
   };
 
   const closeTimer = () => {
-    // Left→right: index 0 (10m) first, index 4 (X) last
+    // Immediately mark closed so re-opening always works (no race with height callback)
+    setTimerOpen(false);
+    // Stagger left→right: 10m (index 0) first, X (index 4) last
     appearAnims.forEach((anim, i) => {
       setTimeout(() => springOut(anim).start(), i * STAGGER_MS);
     });
-    // Collapse height only after the last circle finishes
+    // Collapse height after last circle starts its springOut
     setTimeout(() => {
-      Animated.spring(heightAnim, { toValue: 0, useNativeDriver: false, tension: 70, friction: 12 })
-        .start(() => setTimerOpen(false));
+      Animated.spring(heightAnim, { toValue: 0, useNativeDriver: false, tension: 70, friction: 12 }).start();
     }, NUM_CIRCLES * STAGGER_MS);
   };
 
@@ -328,7 +328,7 @@ function GoalsCard() {
     <View style={[s.goalsCardShadow, cardShadow]}>
       <TouchableOpacity style={s.goalsCard} activeOpacity={0.85} onPressIn={haptic}>
         <View style={{ flex: 1 }}>
-          <Text style={[T.body16b, { color: C.white, marginBottom: 4 }]}>Your goals</Text>
+          <Text style={[T.body16b, { color: C.white, marginBottom: 4 }]}>Share your goals</Text>
           <Text style={[T.body16, { color: "rgba(255,255,255,0.85)" }]}>
             We want to get to know you
           </Text>
